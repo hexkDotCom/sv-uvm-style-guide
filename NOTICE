@@ -1,0 +1,9 @@
+SystemVerilog / UVM Style Guide
+Copyright 2026 HEXK
+
+The guide text is licensed under CC BY 4.0 (see LICENSE-docs).
+Code is licensed under the Apache License 2.0 (see LICENSE).
+
+Acknowledgements (references only; no text is reproduced):
+- Doulos, "Easier UVM Coding Guidelines" (2014-2016).
+- Brian Hunter, "Layering Protocols With Chained Sequencers".

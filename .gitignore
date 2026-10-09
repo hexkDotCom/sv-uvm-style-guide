@@ -1,0 +1,16 @@
+# Editors / OS
+.vscode/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+
+# Simulator output (for future examples)
+csrc/
+simv*
+*.vpd
+*.fsdb
+*.log
+*.key
+work/
+transcript
