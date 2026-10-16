@@ -1,6 +1,6 @@
 # HEXK SystemVerilog / UVM Style Guide
 
-Version 0.2 · 2026-10-16 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
+Version 0.3 · 2026-10-16 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
 
 Copyright 2026 HEXK. Text: [CC BY 4.0](LICENSE-docs). Code examples: [Apache-2.0](LICENSE).
 
@@ -150,7 +150,7 @@ instances of a role live in one scope, prefix the short form: `axi_agent`, `apb_
 | FIL-4 | **MUST NOT** `import` (wildcard or explicit) at compilation-unit scope (outside a `module`, `interface` or `package`). |
 | FIL-5 | Inside a package or module, `` `include "uvm_macros.svh" `` then `import uvm_pkg::*;`. For other packages **SHOULD** use explicit scope (`bus_pkg::bus_item`) or an explicit import inside the package. **SHOULD NOT** wildcard-import user packages into other packages. |
 | FIL-6 | Class files are `` `include ``d into their package in dependency order. Each included file **MUST** have an include guard named after the file: `` `ifndef BUS_DRIVER_SV ``. |
-| FIL-7 | **MUST NOT** use `` `timescale ``. Declare `timeunit`/`timeprecision` in the testbench top module and in interfaces. **MUST** give every delay literal a unit: `#10ns`, `#(period_ps * 1ps)`. Never a bare `#10`. |
+| FIL-7 | **MUST NOT** use `` `timescale ``. **MUST** declare `timeunit` and `timeprecision` in every package, module and interface that contains a delay or a time value, as its first items (before any `import`). **MUST** give every delay literal a unit: `#10ns`, `#(period_ps * 1ps)`. Never a bare `#10`. *A delay is rounded to the precision of the scope that declares it, whatever unit its literal carries: `#100ps` in a class of a package with 1 ns precision is a zero delay.* Cycle delays (`##1`, `@(vif.drv_cb)`) need no unit. |
 | FIL-8 | **SHOULD NOT** build "sequence library" files that collect unrelated sequences. One sequence per file under `sequences/`. |
 | FIL-9 | **SHOULD** put a `README.md` in every agent, env and testbench directory: purpose, usage, config knobs, known limits. *Humans and AI both start there.* |
 | FIL-10 | **MUST NOT** hand-edit generated code (register models, `AUTOINST` blocks). Change the generator input. |
@@ -182,6 +182,9 @@ bus_agent/
 `include "uvm_macros.svh"
 
 package bus_pkg;
+   timeunit 1ns;
+   timeprecision 1ps;
+
    import uvm_pkg::*;
 
    localparam int unsigned ADDR_WIDTH = 32;
@@ -239,7 +242,7 @@ endpackage : bus_pkg
 | CLS-5 | **SHOULD** keep methods short. Split long phase bodies into named helpers (`build_agents()`, `connect_scoreboard()`). |
 | CLS-6 | **SHOULD** declare variables in the narrowest scope. Do not promote a task's local to a class member. |
 | CLS-7 | **SHOULD NOT** initialize variables to their default value (`int count = 0;`). |
-| CLS-8 | Constructors of UVM classes: components `function new(string name, uvm_component parent)`; objects `function new(string name = "<class_name>")`. The body is `super.new(...)` plus, only if needed, covergroup construction or analysis-port construction. Classes that do not derive from a UVM class (plain utility classes, classes of a UVM-free package) take the arguments they need. |
+| CLS-8 | Constructors of UVM classes: components `function new(string name, uvm_component parent)`; objects `function new(string name = "<class_name>")`. The body is `super.new(...)` plus, only if needed, construction of what the class owns: covergroups, analysis ports, child config objects (`CFG-3`). **MUST NOT** create child components in `new` (`CMP-2`). Classes that do not derive from a UVM class (plain utility classes, classes of a UVM-free package) take the arguments they need. |
 
 ---
 
@@ -287,13 +290,23 @@ constraint c1 { foreach (reserved_addrs[i]) addr != reserved_addrs[i]; }
 
 | ID | Rule |
 |---|---|
-| LNG-20 | When a failed `$cast` would be a bug, call it as a **task** (ignore the return value). The simulator reports and stops. |
-| LNG-21 | When failure is an expected outcome (type dispatch), call it as a **function** inside `if` or `case (1)`. |
+| LNG-20 | When a failed `$cast` would be a bug, **MUST** call `$cast` as a function and report failure with `` `uvm_fatal ``. **MUST NOT** call it as a task and rely on the simulator to stop. *The LRM only requires a run-time error for a failed task-form cast; simulators continue with the destination unchanged.* |
+| LNG-21 | When failure is an expected outcome (type dispatch), call `$cast` as a function inside `if` or `case (1)`, and handle the case where nothing matches. A `null` source casts successfully and leaves the destination `null`, so check for `null` first where it is not legal. |
 
 ```systemverilog
+// LNG-20: a failed cast is a bug
+if (!$cast(copy, item.clone())) begin
+   `uvm_fatal("TYPE", "clone of bus_item is not a bus_item")
+end
+
+// LNG-21: type dispatch
 function void write(uvm_sequence_item t);
    bus_item    bus_t;
    irq_item    irq_t;
+   if (t == null) begin
+      `uvm_error("TYPE", "null item received")
+      return;
+   end
    case (1)
       $cast(bus_t, t): handle_bus(bus_t);
       $cast(irq_t, t): handle_irq(irq_t);
@@ -319,8 +332,8 @@ endfunction : write
 | CMP-1 | **MUST** extend the most specific UVM base class: `uvm_driver`, `uvm_monitor`, `uvm_agent`, `uvm_env`, `uvm_scoreboard`, `uvm_subscriber`, `uvm_test`. |
 | CMP-2 | **MUST** create child components in `build_phase` with the factory (`FAC-1`), with `this` as parent. |
 | CMP-3 | **MUST** make TLM connections in `connect_phase`. |
-| CMP-4 | **MUST** call `super.<phase>(phase)` first in every phase method you override. *Uniform, and safe for extension.* |
-| CMP-5 | Drivers, monitors, scoreboards, coverage and models **MUST** run in `run_phase` only and be phase-agnostic. They handle reset by watching the reset signal or a reset event, not by overriding `reset_phase`. *Lets them be reused under any test phasing.* |
+| CMP-4 | **MUST** call `super.<phase>(phase)` first in every function phase you override (`build_phase`, `connect_phase`, `check_phase`, ...). In a task phase (`run_phase`, `main_phase`, ...) call `super` first when the parent is a UVM base class, or when the parent's header says that its task phase returns and is meant to be extended. A base class whose task phase never returns (a driver's `forever` loop) or starts stimulus **MUST** say so in its header (`DOC-1`); a derived class then replaces that phase and does not call `super`. *A derived class that calls a `super.run_phase()` that never returns never reaches its own code.* |
+| CMP-5 | Drivers, monitors, scoreboards, coverage and models **MUST** run in `run_phase` only and be phase-agnostic. They handle reset by watching the reset signal or a reset event, not by overriding `reset_phase`. **MUST**, while reset is active: a driver drives idle values and starts no request; an item that a reset interrupts ends with an error status and exactly one `item_done()`, and the driver does not retry it (the sequence decides; repeating a write may not be safe); a monitor publishes nothing it sampled during reset; a scoreboard flushes (`CHK-6`). *Lets them be reused under any test phasing.* |
 | CMP-6 | Tests (and envs, for default stimulus) **MAY** use `reset_phase`, `configure_phase`, `main_phase` and `shutdown_phase` to start sequences. **SHOULD NOT** override `pre_*`/`post_*` run-time phases; keep them as cross-domain sync points. |
 | CMP-7 | **SHOULD NOT** use phase jumps. If one is unavoidable, document the cleanup each component performs. |
 | CMP-8 | An agent contains only the canonical `sqr`, `drv`, `mon` (plus protocol-intrinsic checks and coverage). It builds `sqr` and `drv` only when `get_is_active() == UVM_ACTIVE`; it always builds `mon`. |
@@ -357,16 +370,41 @@ endfunction : write
 |---|---|
 | CFG-1 | Each configurable component has **one config object** (`<owner>_cfg extends uvm_object`). The config object holds `is_active`, the virtual interface, enables (`has_coverage`, `has_checks`) and protocol knobs. |
 | CFG-2 | Configuration flows **top-down by direct assignment**. The parent creates or receives the child's cfg and sets `child.cfg = ...` in its own `build_phase`, after `create` and before the child's `build_phase` runs. |
-| CFG-3 | Parent config objects **contain** their children's config objects and construct them in `new`. One `randomize()` of the top cfg then randomizes everything, and cross-cfg constraints are possible. |
+| CFG-3 | Parent config objects **contain** their children's config objects as `rand` handles and construct them in `new` (`CLS-8`). One `randomize()` of the top cfg then randomizes every child, and cross-cfg constraints are possible. *A child handle that is not `rand`, or still `null`, is not randomized.* |
 | CFG-4 | `uvm_config_db` is used only (a) to hand virtual interfaces from the testbench module to the test, and (b) across a reuse boundary where the parent cannot see the child type. Every `get` **MUST** be checked and **MUST** use `get(this, "", "<field>", ...)`. |
 | CFG-5 | **MUST NOT** use `uvm_resource_db` directly. **MUST NOT** call `uvm_config_db` in run-time loops. *It is slow, and it costs most at integration level.* Exception: the `REG::` resources that UVM's register sequences read (`NO_REG_TESTS`, `NO_REG_BIT_BASH_TEST`, ...) are set and read through `uvm_resource_db`, as UVM defines them. |
 | CFG-6 | **MUST** validate that a mandatory cfg or vif was received early (`build_phase`/`connect_phase`) with `` `uvm_fatal ``. Never let a null handle crash later. |
 | CFG-7 | Agents override `get_is_active()` to return `cfg.is_active`. |
 | CFG-8 | Env cfgs carry `has_<agent>` bits (default 1) that gate building the agent, fetching its vif, and connecting it (`REU-2`). |
 | CFG-9 | Settings that change at run time and status shared between components live in config objects (handles), never re-fetched from `uvm_config_db`. |
-| CFG-10 | Tests customize through a `virtual function void modify_cfg()` hook called before cfg randomization in the base test, not by rewriting `build_phase`. |
+| CFG-10 | Tests customize the cfg through base-test hooks, not by rewriting `build_phase`. The base test runs, in this order: `do_type_overrides()` (which may replace a cfg class with one that adds constraints) → cfg creation → `modify_cfg()` → checked `randomize()` (`LNG-10`) → `modify_randomized_cfg()` → env build. In `modify_cfg()` a test pins a `rand` knob with `rand_mode(0)` and an assignment, or switches a constraint with `constraint_mode()`. **MUST NOT** plainly assign a `rand` knob in `modify_cfg()`: the randomization overwrites it. `modify_randomized_cfg()` takes plain assignments; no constraint checks them, so use it only for values that no constraint relates to others. |
 
 ```systemverilog
+// soc_env_cfg.sv: child cfgs are rand handles built in new (CFG-3)
+class soc_env_cfg extends uvm_object;
+   bit                         has_bus_agent = 1;
+   rand bus_pkg::bus_agent_cfg bus_agent_cfg;
+   rand dma_pkg::dma_agent_cfg dma_agent_cfg;
+
+   `uvm_object_utils(soc_env_cfg)
+
+   constraint dma_burst_cstr {
+      dma_agent_cfg.max_burst_len <= bus_agent_cfg.max_burst_len;
+   }
+
+   function new(string name = "soc_env_cfg");
+      super.new(name);
+      bus_agent_cfg = bus_pkg::bus_agent_cfg::type_id::create("bus_agent_cfg");
+      dma_agent_cfg = dma_pkg::dma_agent_cfg::type_id::create("dma_agent_cfg");
+   endfunction : new
+endclass : soc_env_cfg
+
+// soc_single_burst_test.sv: pins a rand knob before the base test randomizes the cfg (CFG-10)
+function void modify_cfg();
+   cfg.bus_agent_cfg.max_burst_len.rand_mode(0);
+   cfg.bus_agent_cfg.max_burst_len = 1;
+endfunction : modify_cfg
+
 // soc_env.sv: build_phase hands cfg objects down
 function void build_phase(uvm_phase phase);
    super.build_phase(phase);
@@ -410,17 +448,22 @@ interface bus_if (input logic clk, input logic rst_n);
    logic [31:0] wdata;
    logic [31:0] rdata;
 
+   // rst_n is sampled at the edge like the other inputs, as the DUT sees it.
    clocking drv_cb @(posedge clk);
       output valid, write, addr, wdata;
-      input  ready, rdata;
+      input  ready, rdata, rst_n;
    endclocking : drv_cb
 
    clocking mon_cb @(posedge clk);
-      input valid, ready, write, addr, wdata, rdata;
+      input valid, ready, write, addr, wdata, rdata, rst_n;
    endclocking : mon_cb
 
    modport drv_mp (clocking drv_cb, input rst_n);
    modport mon_mp (clocking mon_cb, input rst_n);
+
+   valid_known_a: assert property (@(posedge clk) disable iff (!rst_n)
+      !$isunknown(valid) && (valid -> !$isunknown(ready)))
+      else $error("valid, or ready during valid, is X or Z");
 
    valid_stable_a: assert property (@(posedge clk) disable iff (!rst_n)
       valid && !ready |=> valid && $stable(addr))
@@ -439,6 +482,7 @@ endinterface : bus_if
 | TRN-3 | Fields that could be randomized are `rand`. Metadata (timestamps, IDs, debug) is not `rand` and is flagged `UVM_NOCOMPARE`. |
 | TRN-4 | Constraints in an item define **legality** only. Scenario shaping belongs in sequences. |
 | TRN-5 | **SHOULD** provide a short one-line `convert2string()` for log messages. Full dumps use `sprint()` (`MSG-7`). |
+| TRN-6 | A monitor **MUST** check every field that the protocol defines as valid at the sampling point for X or Z (`$isunknown`) before storing it in a 2-state field, and report an unknown with `` `uvm_error ``; or it keeps the field 4-state until it is checked. A negative test that expects unknowns demotes that error by ID (`MSG-9`). *Assigning `4'b10x1` to a `bit [3:0]` stores `4'b1001`: the scoreboard can pass on a value the DUT never drove.* |
 
 ```systemverilog
 class bus_item extends uvm_sequence_item;
@@ -480,7 +524,7 @@ endclass : bus_item
 
 | ID | Rule |
 |---|---|
-| SEQ-1 | Reusable stimulus lives in sequences and virtual sequences. Tests select, configure and start them. Test-only code that will never be reused stays in the test. **MUST NOT** create a sequence that only one test will ever use. |
+| SEQ-1 | Stimulus lives in sequences and virtual sequences, even when only one test uses it. A test **SHOULD** only configure, select and start sequences and state what it expects; scenario code (loops over sequences, `fork` of sequences, waits on DUT events) belongs in a virtual sequence. *A scenario in a sequence can be started from another test, a virtual sequence or a higher level; one written in a test cannot.* |
 | SEQ-2 | Generate items with the explicit pattern: `create` → `start_item` → `randomize` (late randomization, after `start_item`) → `finish_item`. |
 | SEQ-3 | **MUST** `randomize()` every sequence object before `start()`, even if it has no `rand` members. *A factory override may add some.* |
 | SEQ-4 | Leaf sequences are always started on a real sequencer, with the parent sequence passed when nested: `seq.start(sqr, this)`. *Needed for locks, grabs, priorities, interrupt handling and sequencer-scoped config.* |
@@ -600,7 +644,7 @@ endclass : soc_traffic_vseq
 | MSG-6 | **MUST** guard expensive message construction (loops, large `sprint()`) with `if (uvm_report_enabled(UVM_HIGH, UVM_INFO, "<ID>")) begin ... end`. **MUST NOT** guard with `get_report_verbosity_level()`, which ignores ID-level settings. |
 | MSG-7 | Print objects with `sprint()` so the active printer policy controls the format. `convert2string()` is for one-line summaries only (`TRN-5`). |
 | MSG-8 | Messages say what was expected, what was observed, and where: `"rdata mismatch addr=0x%0h exp=0x%0h act=0x%0h"`. |
-| MSG-9 | A passing test produces **no** `UVM_ERROR` or `UVM_FATAL`. Expected errors (negative tests) are demoted or caught with `set_report_severity_id_override` or a report catcher, keyed by message ID. |
+| MSG-9 | A passing test produces **no** `UVM_ERROR` or `UVM_FATAL`. A negative test **MUST** catch or demote each expected error by message ID (a report catcher, or `set_report_severity_id_override`), scoped to the component that reports it; **MUST** fail when an expected error did not occur the expected number of times (check it in `check_phase` from the catcher's count or the report server's per-ID count); and **MUST** still fail on any other error. *A blanket demotion turns a negative test whose check never fired into a pass.* |
 
 ```systemverilog
 if (uvm_report_enabled(UVM_HIGH, UVM_INFO, "SB_QUEUE")) begin
@@ -636,7 +680,7 @@ end
 | REG-2 | Each env that uses registers has a `regmodel` handle. The env builds the model only when `regmodel == null` (top level); otherwise the parent assigns the sub-block. |
 | REG-3 | The register hierarchy mirrors the DUT hierarchy. Child blocks are named after their agent or env. |
 | REG-4 | Use explicit prediction: a `uvm_reg_predictor` connected to the bus monitor, with `set_auto_predict(0)`. |
-| REG-5 | Each bus agent that carries register traffic provides a `<bus>_reg_adapter`, setting `provides_responses` when the driver returns responses. |
+| REG-5 | Each bus agent that carries register traffic provides a `<bus>_reg_adapter`. **MUST** set `provides_responses = 0` when the driver writes read data and status into the request before `item_done()`, as `bus_driver` in Appendix A does. **MUST** set it to 1 only when the driver sends a separate response item (`item_done(rsp)` or `put_response(rsp)`), and that response **MUST** carry the request's IDs (`rsp.set_id_info(req)`). *With `provides_responses = 1` and no separate response, every register access waits forever.* |
 | REG-6 | Register sequences extend `uvm_sequence` (or a shared register base sequence), have a `regmodel` member set before `start()`, and pass `.parent(this)` on every access. |
 | REG-7 | Check the returned `uvm_status_e` of every register access. |
 
@@ -647,7 +691,7 @@ end
 | ID | Rule |
 |---|---|
 | TST-1 | Test hierarchy, at most four levels: `uvm_test` → project/common base test (reporting, printer, timeout, objection policy) → `<block>_base_test` (builds the env and cfg, runs reset and init) → `<block>_<feature>_test`. Prefer composing sequences over deep test inheritance. |
-| TST-2 | The base test exposes hooks: `virtual function void do_type_overrides()`, `virtual function void modify_cfg()`. Concrete tests override hooks, not `build_phase`. |
+| TST-2 | The base test exposes hooks: `virtual function void do_type_overrides()`, `virtual function void modify_cfg()`, `virtual function void modify_randomized_cfg()` (`CFG-10`), and `virtual function uvm_sequence_base create_stimulus()`, whose sequence the base test starts in `main_phase` under its objection. Concrete tests **SHOULD** override hooks, not `build_phase` or the base test's phase tasks (`CMP-4`). |
 | TST-3 | The env **MUST** run legal default traffic under an empty test, or the base test **MUST** provide a smoke test. |
 | TST-4 | Select tests with `+UVM_TESTNAME` and `run_test()` with no argument. Prefer plusargs to recompiling for knobs. Exceptions: a top that must also run without UVM's command-line DPI (`UVM_NO_DPI`) **MAY** read `+UVM_TESTNAME` itself and pass it to `run_test()`; a self-contained example **MAY** pass its own test name. |
 | TST-5 | Tests **MUST NOT** reach deep into the hierarchy with long hard-coded paths. Use env-provided handles or accessors. |
@@ -694,6 +738,11 @@ endclass : bus_agent_cfg
 ```systemverilog
 // bus_driver.sv
 // Drives bus_item requests on bus_if; writes read data and status back into the item.
+// Each request goes on the bus at a rising edge, after item.delay_cycles idle cycles; at least one
+// idle cycle separates two requests.
+// Reset (CMP-5): no request starts while rst_n is low. A reset during an item ends it at the first
+// rising edge that sees the reset: valid goes low, item.status stays UVM_NOT_OK, and item_done() is
+// called once. The item is not retried; the sequence decides, since repeating a write may not be safe.
 class bus_driver extends uvm_driver #(bus_item);
    bus_agent_cfg  cfg;
 
@@ -727,8 +776,13 @@ class bus_driver extends uvm_driver #(bus_item);
    endtask : drive_idle
 
    local task drive_item(bus_item item);
+      item.status = UVM_NOT_OK;
+      @(vif.drv_cb iff vif.drv_cb.rst_n === 1'b1);
       repeat (item.delay_cycles) begin
          @(vif.drv_cb);
+         if (vif.drv_cb.rst_n !== 1'b1) begin
+            return;
+         end
       end
       vif.drv_cb.valid <= 1'b1;
       vif.drv_cb.write <= (item.op == BUS_WRITE);
@@ -736,6 +790,10 @@ class bus_driver extends uvm_driver #(bus_item);
       vif.drv_cb.wdata <= item.data;
       do begin
          @(vif.drv_cb);
+         if (vif.drv_cb.rst_n !== 1'b1) begin
+            drive_idle();
+            return;
+         end
       end while (vif.drv_cb.ready !== 1'b1);
       if (item.op == BUS_READ) begin
          item.data = vif.drv_cb.rdata;
@@ -749,6 +807,8 @@ endclass : bus_driver
 ```systemverilog
 // bus_monitor.sv
 // Publishes every completed bus transfer on ap. Passive; never drives the interface.
+// Publishes nothing sampled while rst_n is low (CMP-5). A transfer with an X or Z in a field that is
+// valid in it (write, addr, and wdata or rdata) is reported as BUS_X and not published (TRN-6).
 class bus_monitor extends uvm_monitor;
    bus_agent_cfg                 cfg;
    uvm_analysis_port #(bus_item) ap;
@@ -771,16 +831,26 @@ class bus_monitor extends uvm_monitor;
    endfunction : connect_phase
 
    task run_phase(uvm_phase phase);
-      bus_item item;
       forever begin
-         @(vif.mon_cb iff (vif.mon_cb.valid === 1'b1 && vif.mon_cb.ready === 1'b1));
-         item      = bus_item::type_id::create("item");
-         item.op   = vif.mon_cb.write ? BUS_WRITE : BUS_READ;
-         item.addr = vif.mon_cb.addr;
-         item.data = vif.mon_cb.write ? vif.mon_cb.wdata : vif.mon_cb.rdata;
-         ap.write(item);
+         @(vif.mon_cb iff (vif.mon_cb.rst_n === 1'b1 && vif.mon_cb.valid === 1'b1 && vif.mon_cb.ready === 1'b1));
+         publish_transfer();
       end
    endtask : run_phase
+
+   local function void publish_transfer();
+      bus_item               item  = bus_item::type_id::create("item");
+      logic                  write = vif.mon_cb.write;
+      logic [ADDR_WIDTH-1:0] addr  = vif.mon_cb.addr;
+      logic [DATA_WIDTH-1:0] data  = write ? vif.mon_cb.wdata : vif.mon_cb.rdata;
+      if ($isunknown({write, addr, data})) begin
+         `uvm_error("BUS_X", $sformatf("X or Z in a transfer: write=%b addr=0x%h data=0x%h", write, addr, data))
+         return;
+      end
+      item.op   = write ? BUS_WRITE : BUS_READ;
+      item.addr = addr;
+      item.data = data;
+      ap.write(item);
+   endfunction : publish_transfer
 endclass : bus_monitor
 ```
 
@@ -830,8 +900,62 @@ endclass : bus_agent
 ```
 
 ```systemverilog
+// bus_reg_adapter.sv
+// Converts register accesses to bus_item and back. bus_driver writes read data and status into the
+// request before item_done(), so provides_responses is 0 (REG-5).
+class bus_reg_adapter extends uvm_reg_adapter;
+   `uvm_object_utils(bus_reg_adapter)
+
+   function new(string name = "bus_reg_adapter");
+      super.new(name);
+      provides_responses = 0;
+   endfunction : new
+
+   function uvm_sequence_item reg2bus(const ref uvm_reg_bus_op rw);
+      bus_item item = bus_item::type_id::create("item");
+      item.op   = (rw.kind == UVM_WRITE) ? BUS_WRITE : BUS_READ;
+      item.addr = rw.addr;
+      item.data = rw.data;
+      return item;
+   endfunction : reg2bus
+
+   // The argument keeps the name UVM gives it (bus_item), which hides the class bus_item here; the
+   // package scope names the class.
+   function void bus2reg(uvm_sequence_item bus_item, ref uvm_reg_bus_op rw);
+      bus_pkg::bus_item item;
+      if (!$cast(item, bus_item)) begin
+         `uvm_fatal("TYPE", "bus2reg expects a bus_item")
+      end
+      rw.kind   = (item.op == BUS_WRITE) ? UVM_WRITE : UVM_READ;
+      rw.addr   = item.addr;
+      rw.data   = item.data;
+      rw.status = item.status;
+   endfunction : bus2reg
+endclass : bus_reg_adapter
+```
+
+```systemverilog
+// bus_base_test.sv (excerpt)
+   // Hook (TST-2): the stimulus of the test, started in main_phase; null starts none.
+   virtual function uvm_sequence_base create_stimulus();
+      return null;
+   endfunction : create_stimulus
+
+   task main_phase(uvm_phase phase);
+      uvm_sequence_base seq = create_stimulus();
+      super.main_phase(phase);
+      if (seq != null) begin
+         phase.raise_objection(this, "stimulus");
+         seq.start(env.bus_agent.sqr);
+         phase.drop_objection(this, "stimulus done");
+      end
+   endtask : main_phase
+```
+
+```systemverilog
 // bus_smoke_test.sv
-// Smoke test: 20 random transfers, then waits for the scoreboard to drain.
+// Smoke test: 20 random transfers. bus_base_test starts them in main_phase under its objection;
+// the scoreboard holds its own objection until its expected items drain (OBJ-2).
 class bus_smoke_test extends bus_base_test;
    `uvm_component_utils(bus_smoke_test)
 
@@ -839,16 +963,13 @@ class bus_smoke_test extends bus_base_test;
       super.new(name, parent);
    endfunction : new
 
-   task main_phase(uvm_phase phase);
+   function uvm_sequence_base create_stimulus();
       bus_random_seq seq = bus_random_seq::type_id::create("seq");
-      super.main_phase(phase);
-      phase.raise_objection(this, "bus_smoke_test stimulus");
       if (!seq.randomize() with { num_items == 20; }) begin
          `uvm_fatal("RAND", "bus_random_seq randomization failed")
       end
-      seq.start(env.bus_agent.sqr);
-      phase.drop_objection(this, "bus_smoke_test stimulus done");
-   endtask : main_phase
+      return seq;
+   endfunction : create_stimulus
 endclass : bus_smoke_test
 ```
 
@@ -861,13 +982,14 @@ Run this on every change, whether you are a human reviewer or an AI before handi
 - [ ] 3-space indent, no tabs, ≤ 120 columns, `begin`/`end` everywhere, end labels on every block (`FMT`)
 - [ ] Names: `lower_snake`, constants `UPPER`, no `m_`/`uvm_` prefixes, suffixes per §2.2, `create()` string = variable name (`NAM`)
 - [ ] File header present and meaningful; no restating comments; no dead code; TODOs formatted (`DOC`)
-- [ ] Every class is in a package; no `extern`; no compilation-unit imports; no `` `timescale ``; all delays carry units (`FIL`, `CLS`)
-- [ ] Every `randomize()` is checked with `` `uvm_fatal ``; no `assert(randomize())`; constraints are named `_cstr` (`LNG`)
+- [ ] Every class is in a package; no `extern`; no compilation-unit imports; no `` `timescale ``; `timeunit`/`timeprecision` first in every package, module and interface with timing; all delays carry units (`FIL`, `CLS`)
+- [ ] Every `randomize()` is checked with `` `uvm_fatal ``; no `assert(randomize())`; constraints are named `_cstr`; `$cast` checked as a function where failure is a bug (`LNG`)
+- [ ] Drivers drive idle and end interrupted items on reset; monitors publish nothing during reset and check valid fields for X/Z before storing them 2-state (`CMP-5`, `TRN-6`)
 - [ ] Factory used for every object; no `` `uvm_do* ``; no `p_sequencer`; no field macros in components (`FAC`)
 - [ ] cfg handed down by the parent; mandatory cfg/vif checked with `` `uvm_fatal `` early; no `uvm_config_db` in loops (`CFG`)
 - [ ] Sequences started on a sequencer with parent `this`; sequences randomized before `start()`; `.parent(this)` on register accesses (`SEQ`, `REG`)
 - [ ] Drivers, monitors and scoreboards use `run_phase` only; no fixed end-of-test delays; objections carry descriptions (`CMP`, `OBJ`)
-- [ ] Message IDs are meaningful (never `get_name()`); verbosity set deliberately; expensive prints guarded (`MSG`)
+- [ ] Message IDs are meaningful (never `get_name()`); verbosity set deliberately; expensive prints guarded; negative tests fail when the expected error is absent (`MSG`)
 - [ ] Scoreboard reports leftovers in `check_phase`; passing requires positive evidence of work done (`CHK`, `TST`)
 - [ ] Zero new compile or elaboration warnings (`LNG-32`)
 
@@ -888,7 +1010,7 @@ These are deliberate choices. Change one only by editing this table and the rule
 | Configuration | cfg objects assigned top-down; `config_db` only for vifs and reuse boundaries (`CFG`) | `config_db` for every component (Easier UVM); explicit `configure()` calls |
 | `p_sequencer` | banned; pass handles as members (`SEQ-8`) | `` `uvm_declare_p_sequencer `` (Easier UVM, Advanced UVM) |
 | Virtual sequence sequencer | virtual sequencer if the env has one, else `null` | always a virtual sequencer |
-| `super.<phase>()` | always call (`CMP-4`) | skip `super.build_phase` when extending UVM directly (Easier UVM) |
+| `super.<phase>()` | always in function phases; in task phases as the parent's contract says (`CMP-4`) | skip `super.build_phase` when extending UVM directly (Easier UVM) |
 | `convert2string` vs `sprint` | `sprint` for dumps, `convert2string` for one-liners | `convert2string` only; `sprint` only |
 | Message ID | functional static ID or `get_type_name()` | `get_name()` (rejected) |
 | Agent analysis port | `ap = mon.ap` handle, no forwarding port | forwarded agent-level port; connect to `mon.ap` directly |
