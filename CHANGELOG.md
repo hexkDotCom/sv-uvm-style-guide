@@ -31,6 +31,8 @@ Examples:
   starts at a clock edge, so the driver no longer counts a handshake one cycle before the DUT
   could see it; new `bus_reg_adapter` and `bus_base_test` excerpt; the smoke test overrides
   `create_stimulus()` instead of `main_phase`.
+- Appendix A is labelled as excerpts and says what they leave out; the guide and the README point
+  to the reference testbench of hexk-sv-lib as a complete testbench that runs.
 - The interface example samples `rst_n` in its clocking blocks and asserts that `valid` is known.
 - The casting and cfg examples show the new rules.
 - Appendix B checks the new rules; Appendix C states the `super` decision as `CMP-4` now does.

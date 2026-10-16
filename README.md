@@ -23,8 +23,11 @@ The guide comes from years of production ASIC/SoC verification work.
 Formatting, naming, files and packages, comments, class layout, language usage,
 components and phases, factory and macros, configuration, interfaces, transactions,
 sequences, objections, TLM, checking and scoreboards, messaging, coverage, the register
-layer, tests, and reuse. It also includes a complete minimal agent example, a review
-checklist, and a table of the decisions where common industry practice disagrees.
+layer, tests, and reuse. It also includes a minimal agent example, a review checklist,
+and a table of the decisions where common industry practice disagrees.
+
+For a complete UVM testbench that compiles and runs, see the
+[reference testbench of hexk-sv-lib](https://github.com/hexkDotCom/hexk-sv-lib/tree/v0.9.0/tests/reference).
 
 ## Using it with AI assistants
 

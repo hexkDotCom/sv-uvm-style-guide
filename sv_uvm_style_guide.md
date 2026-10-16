@@ -714,7 +714,14 @@ end
 
 ---
 
-## Appendix A — Complete minimal agent
+## Appendix A — Minimal agent (excerpts)
+
+These files show the rules at work on a small valid/ready bus. To stay short they leave out the
+license line, the include guard and most member comments (`DOC-1`, `FIL-6`, `DOC-5`), and they
+rely on a base test, an env and a testbench top that are only described. For a complete UVM
+testbench that compiles and runs on Questa and VCS, see the
+[reference testbench of hexk-sv-lib](https://github.com/hexkDotCom/hexk-sv-lib/tree/v0.9.0/tests/reference);
+it builds on that library's base classes.
 
 ```systemverilog
 // bus_agent_cfg.sv
