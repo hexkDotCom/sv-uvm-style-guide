@@ -78,7 +78,7 @@ else
 | NAM-1 | **MUST** use `lower_snake_case` for classes, variables, functions, tasks, instances, signals, files, packages, interfaces, modules. No `camelCase`. *Matches the UVM library.* |
 | NAM-2 | **MUST** use `UPPER_SNAKE_CASE` for `parameter`, `localparam`, `` `define `` constants and enum literals. |
 | NAM-3 | **MUST NOT** prefix anything with `uvm_` or `m_`. *`uvm_` belongs to the library; `m_` marks UVM internals (`m_sequencer`), and mixing in our own names hides that distinction.* |
-| NAM-4 | **No member or argument prefixes.** Class members and method arguments use plain names. When an argument shadows a member, disambiguate with `this.`. |
+| NAM-4 | **No member or argument prefixes.** Class members and method arguments use plain names. When an argument shadows a member, disambiguate with `this.`. Where the project's linter treats such shadowing as an error (for example slang `-Wshadow-value`), name the argument for what it is to the member instead (`new_cfg`, `uid_parent`, `item_name`). **MUST NOT** use a prefix or suffix that only marks an argument (`a_`, `i_`, `_arg`). |
 | NAM-5 | **SHOULD** spell words out. Abbreviate only with the approved short forms in §2.3. `config_base_seq`, not `cnfg_base_seq`. |
 | NAM-6 | **SHOULD** use names that state purpose: `first_stage_timer`, not `timer1`. Short names (`i`, `idx`, `item`) are fine for small local scopes. |
 | NAM-7 | **MUST** restrict UVM instance-name strings to `[a-zA-Z0-9_]`, with no double underscores. |
@@ -146,7 +146,7 @@ instances of a role live in one scope, prefix the short form: `axi_agent`, `apb_
 |---|---|
 | FIL-1 | **SHOULD** put one primary class, module, interface or package in each file, named after it: `bus_driver.sv` holds `class bus_driver`. Small helper classes used only by the primary class **MAY** share its file. |
 | FIL-2 | **MUST** use the `.sv` extension for compiled units and files `` `include ``d into packages. **MAY** use `.svh` for macro/header files only. |
-| FIL-3 | **MUST** define every class inside a package, never in a module or at compilation-unit scope. |
+| FIL-3 | **MUST** define every class inside a package, never in a module or at compilation-unit scope. Exception: a self-contained example or unit-test file whose whole testbench is one module **MAY** declare its classes in that module. |
 | FIL-4 | **MUST NOT** `import` (wildcard or explicit) at compilation-unit scope (outside a `module`, `interface` or `package`). |
 | FIL-5 | Inside a package or module, `` `include "uvm_macros.svh" `` then `import uvm_pkg::*;`. For other packages **SHOULD** use explicit scope (`bus_pkg::bus_item`) or an explicit import inside the package. **SHOULD NOT** wildcard-import user packages into other packages. |
 | FIL-6 | Class files are `` `include ``d into their package in dependency order. Each included file **MUST** have an include guard named after the file: `` `ifndef BUS_DRIVER_SV ``. |
@@ -239,7 +239,7 @@ endpackage : bus_pkg
 | CLS-5 | **SHOULD** keep methods short. Split long phase bodies into named helpers (`build_agents()`, `connect_scoreboard()`). |
 | CLS-6 | **SHOULD** declare variables in the narrowest scope. Do not promote a task's local to a class member. |
 | CLS-7 | **SHOULD NOT** initialize variables to their default value (`int count = 0;`). |
-| CLS-8 | Constructors: components `function new(string name, uvm_component parent)`; objects `function new(string name = "<class_name>")`. The body is `super.new(...)` plus, only if needed, covergroup construction or analysis-port construction. |
+| CLS-8 | Constructors of UVM classes: components `function new(string name, uvm_component parent)`; objects `function new(string name = "<class_name>")`. The body is `super.new(...)` plus, only if needed, covergroup construction or analysis-port construction. Classes that do not derive from a UVM class (plain utility classes, classes of a UVM-free package) take the arguments they need. |
 
 ---
 
@@ -259,7 +259,7 @@ endpackage : bus_pkg
 
 | ID | Rule |
 |---|---|
-| LNG-10 | **MUST** check every `randomize()` call and report failure with `` `uvm_fatal ``. **MUST NOT** wrap `randomize()` in `assert`. *Disabling assertions also skips the randomization.* |
+| LNG-10 | **MUST** check every `randomize()` call and report failure with `` `uvm_fatal ``. **MUST NOT** wrap `randomize()` in `assert`. *Disabling assertions also skips the randomization.* Exception: a unit test of a randomizer or of its constraints **MAY** check an expected failure as a result. |
 | LNG-11 | **SHOULD** declare variables that may ever be randomized as `rand`. **MUST NOT** fill them with `$urandom_range()` in procedural code. |
 | LNG-12 | **SHOULD** prefer class constraints over inline `with {}` constraints for anything reused. Inline constraints suit test- or call-site-specific narrowing. |
 | LNG-13 | **MUST** name every constraint `<what>_cstr`, scoped to what it constrains. |
@@ -329,7 +329,7 @@ endfunction : write
 | CMP-11 | Envs **MUST** work both as the top env and as a sub-env (`REU-1`). |
 | CMP-12 | Monitors **MUST NOT** drive interface signals and **MUST NOT** block on anything except the interface. |
 | CMP-13 | Drivers pull items just-in-time (`get_next_item` → drive → `item_done`). Use `try_next_item` when the protocol needs idle cycles driven between items. |
-| CMP-14 | Variable delays within or between items live in the item (`delay_cycles`), so sequences control timing. Only drivers, monitors and interfaces consume time; other components are untimed. |
+| CMP-14 | Variable delays within or between items live in the item (`delay_cycles`), so sequences control timing. Only drivers, monitors and interfaces consume time for the protocol; other components (scoreboards, predictors, coverage) do not delay items. Supervision and timing utilities (watchdogs, timeouts, end-of-test polling, delay models whose purpose is time) **MAY** wait. |
 
 ---
 
@@ -338,7 +338,7 @@ endfunction : write
 | ID | Rule |
 |---|---|
 | FAC-1 | **MUST** create every component, sequence, sequence item and config object through the factory: `type_id::create("name"[, this])`. Never call `new` directly, except for TLM ports, covergroups and `uvm_event`s. |
-| FAC-2 | **MUST** register every class with `` `uvm_component_utils `` / `` `uvm_object_utils `` (or the `_param_` variants). |
+| FAC-2 | **MUST** register every class derived from `uvm_object` (components included) with `` `uvm_component_utils `` / `` `uvm_object_utils `` (or the `_param_` variants). Interface classes, plain utility classes and classes of a UVM-free package are not registered. |
 | FAC-3 | Field macros (`` `uvm_field_* ``) are **allowed on sequence items and config objects**, for print, compare, copy and record. Flag metadata `UVM_NOCOMPARE` and pick a radix (`UVM_HEX`) where it helps. |
 | FAC-4 | **MUST NOT** use field macros in components. *They trigger implicit config-db lookups (`apply_config_settings`). Configuration is explicit here (`CFG`).* |
 | FAC-5 | When field macros are not used, implement `do_copy`, `do_compare`, `do_print`, and `do_record` if transactions are recorded. Implement `do_pack`/`do_unpack` when the item crosses DPI or a packed boundary. |
@@ -359,7 +359,7 @@ endfunction : write
 | CFG-2 | Configuration flows **top-down by direct assignment**. The parent creates or receives the child's cfg and sets `child.cfg = ...` in its own `build_phase`, after `create` and before the child's `build_phase` runs. |
 | CFG-3 | Parent config objects **contain** their children's config objects and construct them in `new`. One `randomize()` of the top cfg then randomizes everything, and cross-cfg constraints are possible. |
 | CFG-4 | `uvm_config_db` is used only (a) to hand virtual interfaces from the testbench module to the test, and (b) across a reuse boundary where the parent cannot see the child type. Every `get` **MUST** be checked and **MUST** use `get(this, "", "<field>", ...)`. |
-| CFG-5 | **MUST NOT** use `uvm_resource_db` directly. **MUST NOT** call `uvm_config_db` in run-time loops. *It is slow, and it costs most at integration level.* |
+| CFG-5 | **MUST NOT** use `uvm_resource_db` directly. **MUST NOT** call `uvm_config_db` in run-time loops. *It is slow, and it costs most at integration level.* Exception: the `REG::` resources that UVM's register sequences read (`NO_REG_TESTS`, `NO_REG_BIT_BASH_TEST`, ...) are set and read through `uvm_resource_db`, as UVM defines them. |
 | CFG-6 | **MUST** validate that a mandatory cfg or vif was received early (`build_phase`/`connect_phase`) with `` `uvm_fatal ``. Never let a null handle crash later. |
 | CFG-7 | Agents override `get_is_active()` to return `cfg.is_active`. |
 | CFG-8 | Env cfgs carry `has_<agent>` bits (default 1) that gate building the agent, fetching its vif, and connecting it (`REU-2`). |
@@ -592,7 +592,7 @@ endclass : soc_traffic_vseq
 
 | ID | Rule |
 |---|---|
-| MSG-1 | Classes report only with `` `uvm_info ``/`` `uvm_warning ``/`` `uvm_error ``/`` `uvm_fatal `` (or the `_context` variants). **MUST NOT** use `$display` in classes. |
+| MSG-1 | UVM classes report only with `` `uvm_info ``/`` `uvm_warning ``/`` `uvm_error ``/`` `uvm_fatal `` (or the `_context` variants). Classes of a UVM-free package report with the severity tasks `$info`/`$warning`/`$error`/`$fatal`. **MUST NOT** use `$display` in classes. |
 | MSG-2 | Message ID: a static, functional ID (`"AXI_RD_RSP"`, `"SB_MISMATCH"`), or `get_type_name()` when nothing more specific fits. **MUST NOT** use `get_name()`. *Instance names depend on where the class is instantiated and are already printed in the message header.* |
 | MSG-3 | Verbosity: `UVM_NONE`, almost never; `UVM_LOW`, rare test-level milestones; `UVM_MEDIUM`, the default for transaction-level activity; `UVM_HIGH`/`UVM_DEBUG`, testbench internals and tracing. |
 | MSG-4 | Severity: `UVM_INFO`, information; `UVM_WARNING`, suspicious but possibly legal; `UVM_ERROR`, a definite failure where simulation can usefully continue; `UVM_FATAL`, simulation cannot meaningfully continue (missing cfg, randomize failure, broken environment). |
@@ -622,7 +622,7 @@ end
 | COV-4 | Keep specification coverage and implementation coverage in separate covergroups. |
 | COV-5 | Gate coverage collection with `cfg.has_coverage`. |
 | COV-6 | Exclude values with `ignore_bins`. **MUST NOT** use `illegal_bins`; illegal values are errors that assertions or checkers must report. |
-| COV-7 | **SHOULD** set `option.at_least` above 1 where repeated hits matter. **MUST NOT** set `option.weight` or `option.goal`. |
+| COV-7 | **SHOULD** set `option.at_least` above 1 where repeated hits matter. **MUST NOT** set `option.weight` or `option.goal`. Exception: weight 0 on coverpoints that exist only to build a cross, so that the cross alone counts. |
 | COV-8 | Design bins from the verification plan: typical, boundary and special values. Keep `iff` guards simple. |
 | COV-9 | Use `cover property` in interfaces for temporal protocol coverage. |
 
@@ -649,7 +649,7 @@ end
 | TST-1 | Test hierarchy, at most four levels: `uvm_test` → project/common base test (reporting, printer, timeout, objection policy) → `<block>_base_test` (builds the env and cfg, runs reset and init) → `<block>_<feature>_test`. Prefer composing sequences over deep test inheritance. |
 | TST-2 | The base test exposes hooks: `virtual function void do_type_overrides()`, `virtual function void modify_cfg()`. Concrete tests override hooks, not `build_phase`. |
 | TST-3 | The env **MUST** run legal default traffic under an empty test, or the base test **MUST** provide a smoke test. |
-| TST-4 | Select tests with `+UVM_TESTNAME` and `run_test()` with no argument. Prefer plusargs to recompiling for knobs. |
+| TST-4 | Select tests with `+UVM_TESTNAME` and `run_test()` with no argument. Prefer plusargs to recompiling for knobs. Exceptions: a top that must also run without UVM's command-line DPI (`UVM_NO_DPI`) **MAY** read `+UVM_TESTNAME` itself and pass it to `run_test()`; a self-contained example **MAY** pass its own test name. |
 | TST-5 | Tests **MUST NOT** reach deep into the hierarchy with long hard-coded paths. Use env-provided handles or accessors. |
 | TST-6 | Pass criterion = **no errors** **and** a positive check that the expected work happened (data compared, scoreboard drained with a non-zero match count). "No errors" alone does not count as a pass. |
 | TST-7 | **MUST NOT** pass or fail on message or packet counts alone. Prove stimulus reached the DUT through coverage. |
@@ -880,7 +880,7 @@ These are deliberate choices. Change one only by editing this table and the rule
 | Topic | Decision | Alternatives seen in the industry |
 |---|---|---|
 | Indentation | 3 spaces | 2 spaces (common), 4 spaces |
-| Member / argument prefixes | none; use `this.` on collision (`NAM-4`) | `m_` members (Doulos Easier UVM); `_arg` arguments |
+| Member / argument prefixes | none; use `this.` on collision, or a descriptive argument name where a linter forbids shadowing (`NAM-4`) | `m_` members (Doulos Easier UVM); `_arg` arguments |
 | Class suffix | role in full (`bus_driver`), no `_c` | `_c` on every class (Advanced UVM / Hawkins style) |
 | Instance names | short roles: `sqr drv mon cfg sb cov` | `m_sequencer`, `m_driver`, `m_config` |
 | Constraint names | `<what>_cstr` | `c_<what>`, `<what>_c`, `<what>_cnstr` |
