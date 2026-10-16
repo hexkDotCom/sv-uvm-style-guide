@@ -1,5 +1,67 @@
 # Changelog
 
+## v0.4 (2026-10-16)
+
+Every rule now carries MUST, SHOULD or MAY. Section 0:
+
+- Waivers: a deviation from a MUST or SHOULD is a `// <ID> waived: <reason>` comment at the code;
+  the AI instructions say the same.
+- Baseline: SystemVerilog IEEE 1800-2017; UVM 1.2 or IEEE 1800.2-2017/2020.
+- Matching an existing file's style covers formatting and naming only. Generated and third-party
+  code are exempt.
+- A table of contents.
+
+Keyword added, meaning unchanged: `FMT-5`, `FMT-8`, `FMT-11`, `DOC-2`, `LNG-21`, `CMP-8`, `CMP-9`,
+`CMP-10`, `CMP-13`, `FAC-3`, `FAC-5`, `FAC-6`, `CFG-1`, `CFG-2`, `CFG-3`, `CFG-7`, `CFG-8`, `CFG-9`,
+`IFC-1`, `IFC-6`, `IFC-7`, `IFC-9`, `TRN-1`, `TRN-4`, `SEQ-2`, `SEQ-4`, `SEQ-5`, `SEQ-9`, `SEQ-12`,
+`SEQ-13`, `SEQ-15`, `OBJ-1`, `OBJ-6`, `TLM-1`, `TLM-2`, `TLM-3`, `TLM-4`, `CHK-1`, `CHK-2`, `CHK-3`,
+`MSG-3`, `MSG-4`, `MSG-7`, `MSG-8`, `COV-1`, `COV-2`, `COV-4`, `COV-5`, `COV-8`, `COV-9`, `REG-1`,
+`REG-2`, `REG-3`, `REG-6`, `REG-7`, `TST-1`, `TST-8`, `REU-1`, `REU-2`, `REU-3`, `REU-4`.
+
+Rules changed:
+
+- `FMT-2`: ASCII applies to SystemVerilog source and file lists; documentation may use UTF-8.
+- `FMT-9`: two consecutive blank lines are a MUST NOT.
+- `NAM-1`, `NAM-4`: names a library defines keep their spelling; an override keeps the argument
+  names of the method it overrides. §2.3 lists more short forms; protocol acronyms are names.
+- `DOC-5`: MUST for the public API of reusable code, SHOULD elsewhere.
+- `DOC-8`: the unit of a quantity is a MUST.
+- `LNG-15`: `local::` for every variable of the calling scope in an inline constraint.
+- `LNG-16`: clear constraints first; staged or element-wise solves keep every constraint that spans
+  them; a mask replaces `%` only where both give the same result.
+- `FAC-1`: analysis FIFOs, exports and imps may be created with `new`.
+- `FAC-2`: abstract UVM classes: the abstract registration macros under IEEE 1800.2, not
+  registered under UVM 1.2.
+- `FAC-10`: SHOULD, with the reason for type-based overrides.
+- `IFC-4`: applies where the interface has clocking blocks and modports.
+- `TRN-3`: metadata is never `rand` and is excluded from compare.
+- `TRN-6`: a component that returns sampled values returns a non-OK status for an unknown value;
+  negative tests tell consumers not to expect dropped transfers.
+- `SEQ-10`: locks, grabs and objections are released on kill and on reset.
+- `SEQ-14`: MUST NOT, with its exception.
+- `OBJ-5`: MAY, after checking that nothing relies on intermediate objection totals.
+- `OBJ-7`: a global timeout is required.
+- `TLM-6` (new): a publisher creates a new object for every `write()` and does not change it later.
+- `CHK-7`: the ISR sequence owns the locks; one lock order; release on completion, kill and reset;
+  the handler states its service latency.
+- `MSG-9`: a negative test counts its expected errors with a catcher on the reporting component that
+  matches ID and original severity; the report server's per-ID count only under stated conditions.
+  New catcher example.
+- `COV-3`: accepted requests and completed responses at the DUT boundary are coverage; generated
+  stimulus is not.
+- `COV-7`: the reason is stated.
+- `REG-4`: MUST, with the reason.
+- `TST-6`: `$error`, SVA failures, simulator errors, abnormal ends and timeouts fail a run.
+
+Examples:
+
+- The interface example states its transfer contract; `request_stable_a` (was `valid_stable_a`)
+  checks `write`, `addr`, and `wdata` for writes.
+- The driver returns `UVM_HAS_X` for read data with an X or Z; `bus_item` says who checks
+  `status`; the adapter checks for `null` before its cast.
+- Appendix B is rebuilt with each rule's level and exceptions; Appendix C has rows for coverage
+  goals and waivers.
+
 ## v0.3 (2026-10-16)
 
 Correctness fixes. Rules changed:

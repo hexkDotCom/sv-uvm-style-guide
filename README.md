@@ -15,7 +15,7 @@ The guide comes from years of production ASIC/SoC verification work.
 
 **Read the guide:** [`sv_uvm_style_guide.md`](sv_uvm_style_guide.md)
 
-> Status: **v0.3, public draft.** Rules may still change before v1.0.
+> Status: **v0.4, public draft.** Rules may still change before v1.0.
 > Rule IDs are never renumbered. Retired rules keep their IDs.
 
 ## What is covered
