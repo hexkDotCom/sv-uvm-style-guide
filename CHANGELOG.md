@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.2 (2026-10-16)
 
 Rules narrowed where they could not apply as written:
 

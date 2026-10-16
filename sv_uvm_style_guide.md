@@ -1,6 +1,6 @@
 # HEXK SystemVerilog / UVM Style Guide
 
-Version 0.1 · 2026-10-09 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
+Version 0.2 · 2026-10-16 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
 
 Copyright 2026 HEXK. Text: [CC BY 4.0](LICENSE-docs). Code examples: [Apache-2.0](LICENSE).
 
