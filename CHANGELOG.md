@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.5 (2026-10-17)
+
+Rules changed so that code a formatter lays out, and reporting that a library builds on UVM,
+conform as written:
+
+- `FMT-13` (new): code that the project's formatter produces satisfies the layout rules that the
+  formatter decides, and is not changed by hand; run the formatter on every change.
+- `FMT-8`, `FMT-11`: where the formatter joins declarations or puts a space before `(`, its layout
+  stands (`FMT-13`).
+- `CLS-1`: a `get_type_name()` override of a parameterized class may come right before `new`.
+- `CLS-8`: a constructor may also build helper objects that are part of the class and must exist
+  before the build phase.
+- `FAC-9`: a project's own report macros may call `uvm_report_*()` when they guard the call as the
+  UVM macros do.
+- `IFC-7`: non-class code that runs with UVM may report through UVM reporting.
+- Appendix B checks `FMT-13`; Appendix C has a row for the formatter.
+
 ## v0.4 (2026-10-16)
 
 Every rule now carries MUST, SHOULD or MAY. Section 0:

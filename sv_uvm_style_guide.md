@@ -1,6 +1,6 @@
 # HEXK SystemVerilog / UVM Style Guide
 
-Version 0.4 · 2026-10-16 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
+Version 0.5 · 2026-10-17 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
 
 Copyright 2026 HEXK. Text: [CC BY 4.0](LICENSE-docs). Code examples: [Apache-2.0](LICENSE).
 
@@ -83,11 +83,12 @@ comment is the only durable record; a PR description or a chat reply does not re
 | FMT-5 | **MUST** put `begin` on the same line as its keyword; `end` lines up with the line that opened it; `end else begin` stays on one line. |
 | FMT-6 | **MUST** close every `class`, `function`, `task`, `module`, `interface`, `package`, `covergroup`, `property`, `sequence`, `clocking` with an end label: `endclass : bus_driver`. *The compiler checks labels; it does not check comments.* |
 | FMT-7 | **MUST NOT** put end comments on `end` (`end // while (...)`). Turn off editor auto-insertion of them. |
-| FMT-8 | **MUST** put one declaration or statement per line. |
+| FMT-8 | **MUST** put one declaration or statement per line. Where the formatter joins declarations (`FMT-13`), its layout stands. |
 | FMT-9 | **SHOULD** leave one blank line between methods; **MUST NOT** leave two or more consecutive blank lines. |
 | FMT-10 | **SHOULD** align consecutive declarations and assignments in columns when it aids scanning (types, names, `=`). Do not realign untouched code. |
-| FMT-11 | **MUST** put one space after keywords and around binary operators: `if (a == b)`, `foreach (q[i])`. No space between a function name and `(`. Parameter lists: `uvm_driver #(bus_item)`. |
+| FMT-11 | **MUST** put one space after keywords and around binary operators: `if (a == b)`, `foreach (q[i])`. No space between a function name and `(`. Parameter lists: `uvm_driver #(bus_item)`. Where the formatter puts a space before `(` (`FMT-13`), its layout stands. |
 | FMT-12 | **SHOULD** keep files under ~500 lines. A larger file usually means a class doing two jobs. |
+| FMT-13 | Code that the project's formatter produces satisfies the layout rules that the formatter decides (spacing, line breaks, what shares a line), and is not changed by hand. **SHOULD** run the formatter on every change. *Examples with verible-verilog-format: a space before the `(` of a covergroup's `sample` and `exclude`; `timeunit` and `timeprecision` on one line.* |
 
 ```systemverilog
 // Good
@@ -274,14 +275,14 @@ endpackage : bus_pkg
 
 | ID | Rule |
 |---|---|
-| CLS-1 | **MUST** order class contents as follows: (1) public API members (knobs, ports, handles, `rand` fields); (2) internal members, marked `local` or `protected`; (3) `` `uvm_*_utils `` registration; (4) constraints; (5) covergroups; (6) `new`; (7) UVM phase methods in phase order; (8) other public methods; (9) `local`/`protected` helper methods. |
+| CLS-1 | **MUST** order class contents as follows: (1) public API members (knobs, ports, handles, `rand` fields); (2) internal members, marked `local` or `protected`; (3) `` `uvm_*_utils `` registration; (4) constraints; (5) covergroups; (6) `new`; (7) UVM phase methods in phase order; (8) other public methods; (9) `local`/`protected` helper methods. A `get_type_name()` override of a parameterized class, which stands in for the name that its registration macro cannot give, **MAY** come right before `new`. |
 | CLS-2 | **MUST** define methods inside the class body. **MUST NOT** use `extern` prototypes. *Maintaining two copies of every signature costs more than it gives; editors outline classes.* |
 | CLS-3 | **SHOULD** mark internal state `local` (or `protected` when extensions need it). |
 | CLS-4 | **MUST NOT** repeat `virtual` when overriding a UVM virtual method (`build_phase`, `do_copy`). **MUST** declare new methods that extensions may override `virtual`. |
 | CLS-5 | **SHOULD** keep methods short. Split long phase bodies into named helpers (`build_agents()`, `connect_scoreboard()`). |
 | CLS-6 | **SHOULD** declare variables in the narrowest scope. Do not promote a task's local to a class member. |
 | CLS-7 | **SHOULD NOT** initialize variables to their default value (`int count = 0;`). |
-| CLS-8 | Constructors of UVM classes: components `function new(string name, uvm_component parent)`; objects `function new(string name = "<class_name>")`. The body is `super.new(...)` plus, only if needed, construction of what the class owns: covergroups, analysis ports, child config objects (`CFG-3`). **MUST NOT** create child components in `new` (`CMP-2`). Classes that do not derive from a UVM class (plain utility classes, classes of a UVM-free package) take the arguments they need. |
+| CLS-8 | Constructors of UVM classes: components `function new(string name, uvm_component parent)`; objects `function new(string name = "<class_name>")`. The body is `super.new(...)` plus, only if needed, construction of what the class owns: covergroups, analysis ports, child config objects (`CFG-3`), and helper objects that are part of the class and must exist before the build phase (a status object, an audit that a derived constructor fills). **MUST NOT** create child components in `new` (`CMP-2`). Classes that do not derive from a UVM class (plain utility classes, classes of a UVM-free package) take the arguments they need. |
 
 ---
 
@@ -397,7 +398,7 @@ endfunction : write
 | FAC-6 | On hot paths (a high-rate copy or compare per transaction), **SHOULD** hand-write `do_copy`/`do_compare` instead of relying on field macros, and measure. |
 | FAC-7 | **MUST NOT** use the `` `uvm_do* ``, `` `uvm_create* ``, `` `uvm_send* `` or `` `uvm_rand_send* `` macro families. Write `create` → `start_item` → `randomize` → `finish_item` explicitly. |
 | FAC-8 | **MUST NOT** use `` `uvm_declare_p_sequencer ``. *It locks a sequence to one sequencer type.* See `SEQ-8` for alternatives. |
-| FAC-9 | **MUST** use the report macros (`` `uvm_info `` and friends), never `uvm_report_*()` calls directly. *The macros skip message construction when the message is filtered.* |
+| FAC-9 | **MUST** use the report macros (`` `uvm_info `` and friends), never `uvm_report_*()` calls directly. Exception: a project's own report macros **MAY** call `uvm_report_*()` when they guard the call with `uvm_report_enabled()` as the UVM macros do. *The macros skip message construction when the message is filtered.* |
 | FAC-10 | Overrides **SHOULD** use `orig::type_id::set_type_override(new_t::get_type())` or `set_inst_override`, and reach the factory with `uvm_factory::get()`. *Overrides by type name are not checked at compile time.* |
 | FAC-11 | **MUST NOT** use deprecated UVM features or undocumented UVM internals (members starting with `m_`, except `m_sequencer`, which is documented). |
 
@@ -471,7 +472,7 @@ endfunction : build_phase
 | IFC-4 | Where the interface has clocking blocks and modports (`IFC-3`), drivers **MUST** access only `drv_cb`/`drv_mp` and monitors only `mon_cb`/`mon_mp`. |
 | IFC-5 | Hierarchical references into the DUT (probes, internal coverage) **MUST** be confined to one bound interface or module. Classes never contain hierarchical paths. |
 | IFC-6 | Low-level protocol assertions (`assert property`) and temporal coverage (`cover property`) **SHOULD** live in the interface. **MUST** label every assertion; the failure message goes through `$error`/`` `uvm_error ``. |
-| IFC-7 | Non-class code **MUST** report with `$info`/`$warning`/`$error`/`$fatal`, never `$display`. |
+| IFC-7 | Non-class code **MUST** report with `$info`/`$warning`/`$error`/`$fatal`, or, when it runs with UVM, through UVM reporting (the global `uvm_report_*()` functions, or a project macro that wraps them with the guard of `FAC-9`); never `$display`. |
 | IFC-8 | **SHOULD**, for emulation/acceleration readiness, put pin-level driving and sampling in interface tasks (BFM style). Keep driver and monitor classes thin and untimed except for calls into the interface. |
 | IFC-9 | The testbench top `<block>_tb` **MUST** instantiate `dut`, the interfaces, the clock/reset generation and the binds. It sets the vifs into `uvm_config_db` and calls `run_test()`. It contains no other test logic. |
 
@@ -1077,7 +1078,7 @@ endclass : bus_smoke_test
 
 Run this on every change, whether you are a human reviewer or an AI before handing back code.
 
-- [ ] 3-space indent, no tabs; `begin`/`end` on bodies of more than one statement (SHOULD on single statements); end labels on the constructs `FMT-6` lists; lines ≤ 120 (SHOULD); ASCII in SV source (`FMT`)
+- [ ] 3-space indent, no tabs; `begin`/`end` on bodies of more than one statement (SHOULD on single statements); end labels on the constructs `FMT-6` lists; lines ≤ 120 (SHOULD); ASCII in SV source; the formatter's layout kept (`FMT-13`) (`FMT`)
 - [ ] Names: `lower_snake`, constants `UPPER`, no `m_`/`uvm_` prefixes, suffixes per §2.2, `create()` string = variable name; overrides keep UVM's argument names (`NAM`)
 - [ ] File header present; public API of reusable code documented; no restating comments; no dead code; TODOs formatted (`DOC`)
 - [ ] Classes in packages (a self-contained example or unit-test file excepted, `FIL-3`); no `extern`; no compilation-unit imports; no `` `timescale ``; `timeunit`/`timeprecision` first in every package, module and interface with timing; all delays carry units (`FIL`, `CLS`)
@@ -1119,6 +1120,7 @@ These are deliberate choices. Change one only by editing this table and the rule
 | Line length | 120 | 100, 150 |
 | Coverage goals | no `option.weight` or `option.goal` (`COV-7`), except weight 0 on coverpoints that only build a cross | goals and weights per group to tune the total |
 | Waivers | a `// <ID> waived: <reason>` comment at the code (§0) | PR description; separate lint waiver files |
+| Formatter output | the formatter decides the layout it enforces (`FMT-13`) | hand formatting to a written standard |
 
 ## Acknowledgements
 
