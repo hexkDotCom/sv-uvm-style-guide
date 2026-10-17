@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.6 (2026-10-17)
+
+Rules made precise where a review of the guide against a real code base found them ambiguous,
+too strict for sound code, or too weak to stop a defect. Rules changed:
+
+- Section 0: a waiver stands directly before the code it covers, with comments and tool
+  directives allowed in between; it covers the next statement, declaration or macro call, and
+  says so when it covers more.
+- `FMT-13`: the project names its formatter, version and options; the formatter decides layout
+  only; code where it is switched off follows the written rules; the project states whether
+  indentation and line length are left to it. "Not changed by hand" is a MUST NOT.
+- `NAM-9`: the `_n` suffix of active-low signals is a MUST.
+- `CLS-8`: a constructor may also set the defaults of the class's own members.
+- `LNG-20`: a cast of `null` succeeds; a result that must exist is also checked for `null`.
+- `CMP-4`: a base class whose task phase starts stimulus says whether a derived class replaces
+  or extends it; one that returns when its stimulus has ended may be extended with `super` first.
+- `CMP-5`: a component whose job is the reset (a clock and reset driver, a reset monitor) keeps
+  working during reset.
+- `CMP-10`: the agent-level handle may be set in `build_phase` once the monitor has its port.
+- `FAC-5`: applies to items, transactions and config objects; a service object implements the
+  hooks it supports and says which.
+- `CFG-4`: a mandatory value is checked with `uvm_fatal`; an optional lookup may go on without a
+  value when it checks the handle and documents the fallback.
+- `CFG-9`, `TLM-1`: status objects and services that the parent passes down are allowed;
+  transaction streams always go through TLM.
+- `TRN-6`: a consumer of an item with a status checks it before converting a 4-state value.
+- `SEQ-2`: a sequence that sets fields after randomizing an item keeps the item's constraints,
+  those of a factory override included, or says which it does not keep.
+- `TLM-5`, `TLM-6`: a receiver changes no object that the received one refers to, and a clone
+  copies what the receiver changes; non-class values are exempt.
+- `MSG-1`: a project's own report macros that guard the call as the UVM macros do are allowed.
+- `MSG-9`: the catcher matches the severity a message has when it reaches the catcher, and no
+  earlier catcher may change it for that ID; a match after the check also fails the test.
+- `TST-2`: the hooks are a MUST. `TST-7`: applies to tests of a DUT; a unit test of verification
+  code checks its results directly.
+- Appendix B: the factory line follows `FAC-1` and `FAC-2`, and checks the hooks of `FAC-5`.
+
 ## v0.5 (2026-10-17)
 
 Rules changed so that code a formatter lays out, and reporting that a library builds on UVM,
