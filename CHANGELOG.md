@@ -16,6 +16,8 @@ conform as written:
   UVM macros do.
 - `IFC-7`: non-class code that runs with UVM may report through UVM reporting.
 - Appendix B checks `FMT-13`; Appendix C has a row for the formatter.
+- The guide and the README link to the reference testbench of hexk-sv-lib at tag `v0.10.0`, which
+  follows guide v0.4.
 
 ## v0.4 (2026-10-16)
 
