@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.6 (2026-10-17)
+## v0.6 (2026-10-21)
 
 Rules made precise where a review of the guide against a real code base found them ambiguous,
 too strict for sound code, or too weak to stop a defect. Rules changed:
@@ -36,6 +36,7 @@ too strict for sound code, or too weak to stop a defect. Rules changed:
 - `TST-2`: the hooks are a MUST. `TST-7`: applies to tests of a DUT; a unit test of verification
   code checks its results directly.
 - Appendix B: the factory line follows `FAC-1` and `FAC-2`, and checks the hooks of `FAC-5`.
+- The guide and the README link to the reference testbench of hexk-sv-lib at tag `v0.11.0`.
 
 ## v0.5 (2026-10-17)
 

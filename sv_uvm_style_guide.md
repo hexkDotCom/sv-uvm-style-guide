@@ -1,6 +1,6 @@
 # HEXK SystemVerilog / UVM Style Guide
 
-Version 0.6 · 2026-10-17 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
+Version 0.6 · 2026-10-21 · Scope: verification code (testbench, UVM, VIP). RTL is out of scope.
 
 Copyright 2026 HEXK. Text: [CC BY 4.0](LICENSE-docs). Code examples: [Apache-2.0](LICENSE).
 
@@ -809,7 +809,7 @@ These files show the rules at work on a small valid/ready bus. To stay short the
 license line, the include guard and most member comments (`DOC-1`, `FIL-6`, `DOC-5`), and they
 rely on a base test, an env and a testbench top that are only described. For a complete UVM
 testbench that compiles and runs on Questa and VCS, see the
-[reference testbench of hexk-sv-lib](https://github.com/hexkDotCom/hexk-sv-lib/tree/v0.10.0/tests/reference);
+[reference testbench of hexk-sv-lib](https://github.com/hexkDotCom/hexk-sv-lib/tree/v0.11.0/tests/reference);
 it builds on that library's base classes.
 
 ```systemverilog

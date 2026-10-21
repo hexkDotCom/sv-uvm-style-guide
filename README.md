@@ -27,7 +27,7 @@ layer, tests, and reuse. It also includes a minimal agent example, a review chec
 and a table of the decisions where common industry practice disagrees.
 
 For a complete UVM testbench that compiles and runs, see the
-[reference testbench of hexk-sv-lib](https://github.com/hexkDotCom/hexk-sv-lib/tree/v0.10.0/tests/reference).
+[reference testbench of hexk-sv-lib](https://github.com/hexkDotCom/hexk-sv-lib/tree/v0.11.0/tests/reference).
 
 ## Using it with AI assistants
 
